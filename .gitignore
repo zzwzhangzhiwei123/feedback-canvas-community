@@ -1,0 +1,15 @@
+__pycache__/
+*.pyc
+*.spec
+.build/
+build/
+dist/
+outputs/
+*.exe
+*.log
+preview/
+smoke-data/
+lan-ui-*/
+v064-*/
+tmp*/
+.test-*/
