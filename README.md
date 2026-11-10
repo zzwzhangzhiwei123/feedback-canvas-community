@@ -4,8 +4,8 @@ Windows 桌面视觉反馈工具：无限画布、可编辑图片与标注、.fb
 
 ## 下载
 
-- **稳定版 v0.6.5**：[下载 Windows EXE](https://github.com/zzwzhangzhiwei123/feedback-canvas-community/releases/download/v0.6.5/FeedbackCanvas-v0.6.5.exe)。
-- **预览版 v0.6.6**：[说明与下载](https://github.com/zzwzhangzhiwei123/feedback-canvas-community/releases/tag/v0.6.6)，新增非破坏性调色与加载条，仍待人工功能验收。
+- **最新稳定版 v0.6.6**：[下载 Windows EXE](https://github.com/zzwzhangzhiwei123/feedback-canvas-community/releases/download/v0.6.6/FeedbackStudio-v0.6.6.exe)。
+- [v0.6.6 版本说明](https://github.com/zzwzhangzhiwei123/feedback-canvas-community/releases/tag/v0.6.6)：非破坏性调色与加载条；维护者已于 2026-11-10 确认完成验收，作为最新稳定版。
 - [全部发行版](https://github.com/zzwzhangzhiwei123/feedback-canvas-community/releases) · [源码 ZIP](https://github.com/zzwzhangzhiwei123/feedback-canvas-community/archive/refs/heads/main.zip) · [报告问题](https://github.com/zzwzhangzhiwei123/feedback-canvas-community/issues)
 
 下载 Release 中的 .exe 后运行，不需要 Python。Source code ZIP 是源码。程序没有自动更新器；升级时下载新版本，保留旧程序和项目备份。
