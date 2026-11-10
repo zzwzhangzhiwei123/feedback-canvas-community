@@ -324,21 +324,24 @@ def _read_member(archive, info, limit):
 MATERIALIZE_BUDGET = 768 * 1024 * 1024
 
 
-def load_project(path, materialize=False):
+def load_project(path, materialize=False, progress=None):
     """materialize=True (call from a worker thread): decode images here and return in-memory
     references, so building the canvas on the UI thread needs no PNG decoding. The original PNG
     bytes are retained, so saving writes identical assets. Callers must assets.release_pending()."""
     records, meta, raw = _load_project(path)
     if materialize:
-        _materialize(records, raw)
+        _materialize(records, raw, progress)
     return records, meta
 
 
-def _materialize(records, raw):
+def _materialize(records, raw, progress=None):
     budget = MATERIALIZE_BUDGET
     refs = {}
+    total = len(raw)
     try:
         for record in records:
+            if progress and total:
+                progress(len(refs), total)
             encoded = record.get("image", "")
             if not encoded or assets.is_ref(encoded):
                 continue

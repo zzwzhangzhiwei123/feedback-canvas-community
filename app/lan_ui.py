@@ -157,7 +157,7 @@ class LanBinding(QObject):
         generation=self.generation
         def done(result,error):
             if not self.alive() or generation!=self.generation:
-                if dropped and result and result.get('ok'):dropped(result['value'])
+                if dropped:dropped(result['value'] if result and result.get('ok') else None)
                 return
             if error:result={'ok':False,'error':error.strip().splitlines()[-1],'status':0}
             callback(result)
@@ -209,11 +209,14 @@ class LanBinding(QObject):
         if self.doc.dirty and not discard:
             self.doc.message('当前有未提交修改，请先保存更新或另存本地，刷新不会覆盖这些修改。',10000);return False
         self.busy=True;self.sync_controls();view=self.doc.view.view_meta();first=self.initial
+        bar=self.doc.loading;token=bar.begin('正在读取共享项目…' if first else '正在同步同事的修改…',delay=150)
         def fetch():
-            result=self.client.download(self.cache)
-            records,meta=storage.load_project(str(self.cache),materialize=True)
+            result=self.client.download(self.cache,progress=bar.reporter(token,'正在下载共享项目…'))
+            bar.report(token,0,0,'正在载入图片…')
+            records,meta=storage.load_project(str(self.cache),materialize=True,progress=bar.reporter(token,'正在载入图片…'))
             return result,records,meta
         def done(result):
+            bar.end(token)
             self.busy=False
             if not result['ok']:self.lose_connection(result['error']);return
             details,records,meta=result['value']
@@ -226,7 +229,7 @@ class LanBinding(QObject):
             except Exception as exc:self.lose_connection(str(exc))
             finally:assets.release_pending(records)
             self.sync_controls();self.manager.workspace.position_overlay()
-        self.submit(fetch,done,dropped=lambda value:assets.release_pending(value[1]));return True
+        self.submit(fetch,done,dropped=lambda value:(bar.end(token),value and assets.release_pending(value[1])));return True
     def acquire(self):
         if self.busy or self.lease or self.initial:return
         self.busy=True;self.sync_controls()
@@ -274,7 +277,10 @@ class LanBinding(QObject):
         destination=local_destination or str(self.cache)
         self.busy=True;d._manual_save_busy=True;d._save_outcome=False;d._save_token=token;d._saving_digest=digest
         d.selection_status.hide();d.guidance.hide();d.save_indicator.begin();self.sync_controls()
-        def report(value,phase):d.save_events.progress.emit(token,value,phase)
+        bar=d.loading;bar_token=bar.begin('正在保存…',100,delay=150)
+        def report(value,phase):
+            d.save_events.progress.emit(token,value,phase)
+            bar.report(bar_token,value if value>=0 else None,None,phase)
         def write():
             try:
                 storage.save_project(destination,records,meta,progress=lambda n,s:report(int(n*.7) if n>=0 else n,s))
@@ -288,6 +294,7 @@ class LanBinding(QObject):
                     raise
             finally:assets.unpin(pins)
         def done(result,error):
+            bar.end(bar_token)
             self.manager.workspace._reserved.pop(d,None)
             if not self.alive():return
             self.busy=False;d._manual_save_busy=False;d._save_outcome=not bool(error)
@@ -580,7 +587,11 @@ class LanController(QObject):
             doc=matched or self.workspace.new_document()
             binding=LanBinding(self,doc,client,self.service.state.status(),owner_path=str(self.service.state.project))
             self.bindings.add(binding);self.host_binding=binding;self.update_dialog()
-        self.jobs.submit(lambda:outcome(lambda:ShareService(path,directory,storage.load_project,address,port,advertise=advertise)),done)
+        current=self.workspace.current_document();share_token=current.loading.begin('正在开启共享（复制历史副本、生成加密证书）…') if current else None
+        def finished(result,error):
+            if current is not None and share_token:current.loading.end(share_token)
+            done(result,error)
+        self.jobs.submit(lambda:outcome(lambda:ShareService(path,directory,storage.load_project,address,port,advertise=advertise)),finished)
     def connect_share(self,code,name):
         if self.busy:return
         try:client=prepare_client(code,name)
@@ -606,7 +617,7 @@ class LanController(QObject):
         if doc:doc.message('正在连接同事的共享…',6000)
         self.jobs.submit(lambda:outcome(client.status),done)
     def report(self,text):
-        if self.dialog:self.dialog.diagnostic.setPlainText('反馈画布 v0.6.5\n'+text)
+        if self.dialog:self.dialog.diagnostic.setPlainText('反馈画布 v0.6.6\n'+text)
     def test_connection(self,code,name):
         if self.busy:return
         try:client=prepare_client(code,name)

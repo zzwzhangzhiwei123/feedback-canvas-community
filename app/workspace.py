@@ -145,7 +145,7 @@ class WorkspaceWindow(QMainWindow):
             if self.tabbar.tabData(index) is doc:
                 self.tabbar.setTabText(index,label.replace('&','&&'))
                 self.tabbar.setTabToolTip(index,str(doc.current_file or name));break
-        if self.current_document() is doc:self.setWindowTitle(label+' — 反馈画布 v0.6.5')
+        if self.current_document() is doc:self.setWindowTitle(label+' — 反馈画布 v0.6.6')
         self.position_overlay()
 
     def position_overlay(self):
@@ -282,7 +282,9 @@ class WorkspaceWindow(QMainWindow):
         if doc is None:return False
         doc.current_file=str(path);doc._loading_project=True;doc.workspace_stack.setEnabled(False)
         doc.top_toolbar.setEnabled(False);self.update_document(doc)
+        token=doc.loading.begin('正在打开 '+Path(path).name+'…',delay=150)
         def loaded(result,error):
+            doc.loading.end(token)
             if doc._closing:
                 import assets_runtime as assets
                 if result:assets.release_pending(result[0])
@@ -303,7 +305,7 @@ class WorkspaceWindow(QMainWindow):
                 import assets_runtime as assets
                 assets.release_pending(records)
             if self.current_document() is doc:doc.view.setFocus()
-        doc.jobs.submit(lambda:storage.load_project(str(path),materialize=True),loaded,10)
+        doc.jobs.submit(lambda:storage.load_project(str(path),materialize=True,progress=doc.loading.reporter(token,'正在解码图片…')),loaded,10)
         return True
 
     def can_save(self,doc,path):

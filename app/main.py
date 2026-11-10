@@ -130,13 +130,13 @@ def runtime_directory():
     override = os.environ.get("FEEDBACK_DATA_DIR")
     root = Path(override).expanduser() if override else Path(
         QStandardPaths.writableLocation(QStandardPaths.StandardLocation.AppLocalDataLocation)
-    ) / "v0.6.5"
+    ) / "v0.6.6"
     fresh = not root.exists()
     root.mkdir(parents=True, exist_ok=True)
     if fresh and not override:
         # Carry over presets, recent files and window layout from the previous release
         # (recovery copies stay with their own version).
-        for version in ("v0.6.4", "v0.6.3"):
+        for version in ("v0.6.5", "v0.6.4", "v0.6.3"):
             previous = root.parent.parent / f"FeedbackStudio-{version}" / version / "settings.json"
             try:
                 if previous.is_file() and not (root / "settings.json").exists():
@@ -349,6 +349,8 @@ class MainWindow(QMainWindow):
         self.setCentralWidget(self.workspace_stack)
         self._build_footer()
         self._build_empty_card()
+        from progress_ui import LoadBar
+        self.loading = LoadBar(self.view.viewport())
         self._connect_view()
         self._restore_window_settings()
         self._reset_history(clean=True)
@@ -551,6 +553,9 @@ class MainWindow(QMainWindow):
         self.tabs.setDocumentMode(True)
         self.tabs.addTab(self._properties_page(), "属性")
         self.tabs.addTab(self._regions_page(), "区域")
+        from image_panel import ImagePanel
+        self.image_panel = ImagePanel(self)
+        self.tabs.addTab(self.image_panel, "图片")
         self.tabs.currentChanged.connect(lambda index: self._refresh_regions() if index == 1 else None)
         side_layout.addWidget(self.tabs)
         layout.addWidget(self.sidebar)
@@ -1075,6 +1080,8 @@ class MainWindow(QMainWindow):
         if self._closing:
             return
         self._tool_changed(self.view.tool)
+        if hasattr(self, "image_panel"):
+            self.image_panel.refresh()
         self._refreshing = True
         try:
             items = self.view.selected()
@@ -1469,10 +1476,11 @@ class MainWindow(QMainWindow):
         if isinstance(paths,(str,Path)):paths=[str(paths)]
         if not paths:return False
         paths=list(paths)
-        def load():
+        def load(report=None):
             records=[]
             try:
-                for path in paths:
+                for number,path in enumerate(paths):
+                    if report:report(number,len(paths))
                     record=storage.import_image(path)
                     record.update(name=Path(path).stem,source_path=str(path));records.append(record)
                 return records
@@ -1480,7 +1488,7 @@ class MainWindow(QMainWindow):
                 assets.release_pending(records)
                 raise
         self._remember_directory(paths[0])
-        return self._queue_import(load,anchor)
+        return self._queue_import(load,anchor,progress=True,text=f"正在导入 {len(paths)} 张图片…" if len(paths)>1 else "正在载入图片…")
 
     def _files_dropped(self, paths):
         projects = [str(path) for path in paths if str(path).lower().endswith(".fbboard")]
@@ -1558,13 +1566,19 @@ class MainWindow(QMainWindow):
         self._save_settings()
         self.message("复制始终保留原图分辨率，底色跟随编组或画布。")
 
-    def _queue_import(self, function, anchor, rich=False):
+    def _queue_import(self, function, anchor, rich=False, progress=False, text="正在载入图片…"):
         epoch=self._document_epoch
         self._import_seq+=1;sequence=self._import_seq
+        token=self.loading.begin(text)
+        tokens=getattr(self,"_import_tokens",None)
+        if tokens is None:tokens=self._import_tokens={}
+        tokens[sequence]=token
+        work=(lambda:function(self.loading.reporter(token))) if progress else function
         self.message("正在后台载入图片，可以继续操作画布…")
         def ready(records,error):
             self._imports[sequence]=(records,error,epoch,anchor,rich)
             while self._import_next in self._imports:
+                self.loading.end(self._import_tokens.pop(self._import_next,0))
                 values=self._imports.pop(self._import_next);self._import_next+=1
                 incoming,failure,document,position,editable=values
                 if failure:
@@ -1581,7 +1595,7 @@ class MainWindow(QMainWindow):
                 except Exception as exc:
                     LOGGER.exception("插入图片失败");self.message(str(exc),10000)
                 finally:assets.release_pending(incoming or [])
-        self.jobs.submit(function,ready,10)
+        self.jobs.submit(work,ready,10)
         return True
 
     def paste(self):
@@ -1897,7 +1911,7 @@ class MainWindow(QMainWindow):
         destination=str(path) if path else self.current_file
         if self._legacy_source and not path:
             source=Path(self._legacy_source)
-            destination=str(source.with_name(source.stem+"-v0.6.5"+source.suffix))
+            destination=str(source.with_name(source.stem+"-v0.6.6"+source.suffix))
             save_as=True
         if not destination or save_as:
             default=destination or str(Path(self._dialog_dir())/"未命名画布.fbboard")
@@ -2567,7 +2581,7 @@ def main(argv=None):
     if share_link:
         arguments.project = None
     QApplication.setOrganizationName("FeedbackStudio")
-    QApplication.setApplicationName("FeedbackStudio-v0.6.5")
+    QApplication.setApplicationName("FeedbackStudio-v0.6.6")
     QApplication.setApplicationDisplayName(contracts.APP_NAME)
     app = QApplication.instance() or QApplication([sys.argv[0]])
     app.setStyle("Fusion")

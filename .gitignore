@@ -13,3 +13,9 @@ lan-ui-*/
 v064-*/
 tmp*/
 .test-*/
+.venv/
+.dev-data/
+.release-test-data/
+.env
+.env.*
+!.env.example

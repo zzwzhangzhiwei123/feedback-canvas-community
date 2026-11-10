@@ -2,3 +2,4 @@ PySide6-Essentials==6.11.2
 pyinstaller==6.22.3
 
 cryptography>=46,<51
+numpy==2.3.5

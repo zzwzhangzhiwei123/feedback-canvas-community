@@ -398,9 +398,11 @@ class BoardItem(QGraphicsObject):
         if getattr(self, "_image_key", None) != key:
             self._image = base64_to_image(key)
             self._image_key = key
-            self._preview = assets.image(key, preview=True) if assets.is_ref(key) else (
+            self._raw_preview = assets.image(key, preview=True) if assets.is_ref(key) else (
                 self._image.scaled(1536,1536,Qt.AspectRatioMode.KeepAspectRatio,Qt.TransformationMode.FastTransformation)
                 if max(self._image.width(),self._image.height()) > 1536 else self._image)
+            self._adj_sig = None
+        self._apply_adjustments()
         self._source_rect = QRectF()
         if self._image.isNull():
             return
@@ -564,6 +566,51 @@ class BoardItem(QGraphicsObject):
         layout.draw(painter, context)
         painter.restore()
 
+    def _apply_adjustments(self):
+        """Non-destructive colour edits: originals stay in self._image / the record."""
+        import adjust
+        params = adjust.clean(self.record.get("adjust")) if self.record.get("kind") == "image" else None
+        sig = adjust.signature(params) if params else None
+        if sig == getattr(self, "_adj_sig", None) and hasattr(self, "_preview"):
+            return
+        self._adj_sig = sig
+        self._adj = params
+        self._adj_full = None
+        raw = getattr(self, "_raw_preview", QImage())
+        if params is None or self._image.isNull():
+            self._preview = raw
+            return
+        sid = adjust.source_id(self.record["image"])
+        scale = raw.width() / max(1, self._image.width())
+        self._preview = adjust.cached(raw, params, sid, "preview", scale)
+        if raw.width() == self._image.width():
+            self._adj_full = self._preview
+            return
+        self._adj_full = adjust.peek(sid, "full", params)
+        if self._adj_full is None:
+            if getattr(self, "_full_timer", None) is None:
+                from PySide6.QtCore import QTimer
+                self._full_timer = QTimer(self)
+                self._full_timer.setSingleShot(True)
+                self._full_timer.setInterval(350)
+                self._full_timer.timeout.connect(self._request_full)
+                adjust.hub().ready.connect(self._full_ready)
+            self._full_timer.start()
+
+    def _request_full(self):
+        import adjust
+        if self._adj is not None and self._adj_full is None:
+            self._adj_wait = adjust.request_full(self._image, self._adj, adjust.source_id(self.record["image"]))
+
+    def _full_ready(self, key):
+        import adjust
+        if self._adj is None or key != getattr(self, "_adj_wait", None):
+            return
+        if key[2] != adjust.signature(self._adj):
+            return
+        self._adj_full = adjust.peek(key[0], "full", self._adj)
+        self.update()
+
     def _paint_image(self, painter):
         painter.save()
         painter.setClipPath(self._path, Qt.ClipOperation.IntersectClip)
@@ -593,9 +640,18 @@ class BoardItem(QGraphicsObject):
                 source.moveCenter(center)
             bitmap = self._image
             preview = getattr(self, "_preview", QImage())
+            exporting = getattr(self, "export_render", False)
+            waiting = False
+            if getattr(self, "_adj", None) is not None:
+                if self._adj_full is None and exporting:
+                    import adjust
+                    self._adj_full = adjust.cached(self._image, self._adj, adjust.source_id(self.record["image"]), "full")
+                waiting = self._adj_full is None
+                if not waiting:
+                    bitmap = self._adj_full
             screen = painter.worldTransform().mapRect(self._rect)
             ratio = max(screen.width()/max(1,source.width()), screen.height()/max(1,source.height()))
-            if not getattr(self,"export_render",False) and not preview.isNull() and ratio < preview.width()/max(1,self._image.width())*1.3:
+            if not exporting and not preview.isNull() and (waiting or ratio < preview.width()/max(1,self._image.width())*1.3):
                 sx,sy=preview.width()/self._image.width(),preview.height()/self._image.height()
                 source=QRectF(source.x()*sx,source.y()*sy,source.width()*sx,source.height()*sy)
                 bitmap=preview

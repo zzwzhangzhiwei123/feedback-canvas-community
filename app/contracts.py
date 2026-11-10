@@ -1,6 +1,6 @@
 """Shared on-disk and scene contract for Feedback Studio."""
 APP_NAME = "反馈画布"
-APP_VERSION = "0.6.5"
+APP_VERSION = "0.6.6"
 MIME_TYPE = "application/x-feedback-studio-items+json"
 FORMAT_VERSION = 1
 # Each record is JSON serializable:
