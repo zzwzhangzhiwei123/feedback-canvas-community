@@ -68,6 +68,7 @@ $env:FEEDBACK_DATA_DIR = Join-Path $PWD '.dev-data'
 | [测试与发布](docs/TESTING_AND_RELEASE.md) | 测试命令、已知限制、打包与验收 |
 | [当前交接状态](docs/HANDOFF.md) | 当前版本、待办与后续交接格式 |
 | [维护者同步](docs/MAINTAINER.md) | 审核、合并、独立仓库间选择性采纳 |
+| [Fork 维护记录](docs/FORK_MAINTENANCE.md) | 下游 Fork 的维护流程、分支登记、与上游的同步记录 |
 
 **贡献者只推送到自己的 Fork 和功能分支。** 公开可读不代表有写入本仓库的权限。PR 由维护者决定是否合并，不自动合并或发布。本仓库独立提供桌面开发所需源码、依赖、测试和文档，不依赖私人仓库或聊天记录。
 

@@ -4,7 +4,7 @@
 
 ## 开始
 
-按顺序读 README.md、CONTRIBUTING.md、docs/HANDOFF.md，再按任务读架构和测试文档。检查 git status --short --branch、git remote -v、当前提交与既有未提交改动。代码及实际验证结果优先于过时描述。
+按顺序读 README.md、CONTRIBUTING.md、docs/HANDOFF.md，在下游 Fork 工作时再读 docs/FORK_MAINTENANCE.md，然后按任务读架构和测试文档。检查 git status --short --branch、git remote -v、当前提交与既有未提交改动。代码及实际验证结果优先于过时描述。
 
 ## 分支与权限
 
